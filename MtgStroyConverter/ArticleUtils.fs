@@ -9,12 +9,11 @@ open FSharp.Data
 type Chapter = { title: string; url: string }
 type Article = {
     mutable index: int 
-    chapter: string 
+    mutable chapter: string 
     subtitle: string
     body: string
     url: string
 }
-
 
 let printChapter chapter =
     Console.WriteLine $"{{ title: {chapter.title}, url: {chapter.url} }}"
@@ -25,33 +24,31 @@ let indexUrl = "https://mtg-jp.com/reading/ur/"
 let rawDirectory = "./output/raw/"
 let bodyDirectory = "./output/本文"
 let tocFileName = "./output/toc.yaml"
-
-let removeImagePattern = Regex("<img.+?/>")
-
-let removeImage (line: string): string =
-    removeImagePattern.Replace(line, "")
-    
+let regexs = [
+   (Regex("<a.*?>"), "");
+   (Regex("</a>"), "")
+]
 
 let createArticleYaml (article: Article): string  =
    let builder = StringBuilder()
    builder.Append("---\r\n")
        .Append($"index: \"{article.index}\"\r\n")
        .Append($"href: \"https://ncode.syosetu.com/n7777gg/\"\r\n")
-       .Append($"chapter: \"{article.chapter}\"\r\n")
+       .Append($"chapter: {article.chapter}\r\n")
        .Append($"subchapter: \"\"\r\n")
        .Append($"subtitle: {article.subtitle}\r\n")
        .Append($"file_subtitle: {article.subtitle}\r\n")
        .Append($"subdate: \"{currentTime}\"\r\n")
        .Append($"subupdate: \"{currentTime}\"\r\n")
        .Append($"element:\r\n")
-       .Append($"\tdata_type: html\r\n")
-       .Append($"\tintroduction: \"\"\r\n")
-       .Append($"\tpostscript: \"\"\r\n")
-       .Append($"\tbody: |-\r\n")
+       .Append($"  data_type: html\r\n")
+       .Append($"  introduction: \"\"\r\n")
+       .Append($"  postscript: \"\"\r\n")
+       .Append($"  body: |-\r\n")
    |> ignore
    let filtered = article.body.Split "\r\n"
    for line in filtered do
-     builder.Append $"{removeImage line}\r\n" |> ignore
+     builder.Append $"    {line}\r\n" |> ignore
    builder.ToString()
          
 let saveArticle (article: Article): unit =
@@ -68,7 +65,7 @@ let saveTocYaml (articles: Article list) : unit =
     if File.Exists tocFileName then File.Delete tocFileName
     use writer = new StreamWriter(tocFileName)
     writer.WriteLine "---"
-    writer.WriteLine "title: MTG背景世界ストーリー"
+    writer.WriteLine "title: MTG 背景世界ストーリー"
     writer.WriteLine "author: Wizards of the Coast"
     writer.WriteLine "toc_url: https://ncode.syosetu.com/n7777gg/"
     writer.WriteLine "story: something something something..."
@@ -106,3 +103,12 @@ let loadHtml (url: string) : HtmlDocument =
         use writer = new StreamWriter(cacheFile) 
         writer.Write(result.ToString())
         result
+
+let applyReplacement (state: string) ((elem: Regex), (replacement: string)) =
+    elem.Replace(state, replacement)
+
+let extractParagraph (para: string) : string =
+    let text = List.fold applyReplacement para regexs
+    text
+    
+    

@@ -5,17 +5,10 @@ open MtgStroyConverter.ArticleUtils
 let parseBody (articleUrl: string) : string =
     let doc = loadHtml articleUrl
     let bodyNode = doc.Descendants ["div"] |> Seq.filter (fun n -> n.HasClass "detail") |> Seq.head
-
-    let lines = bodyNode.ToString().Split("\r\n")
-    let trimmed = lines |> Seq.skip 1 |> Seq.take ((Seq.length lines) - 2)
-    let text = String.Join("\r\n", trimmed)
-    match text.Split("<p style=\"clear:both;\">&nbsp;</p>") |> List.ofArray with
-    | _ :: (body :: _) -> body
-    | [ head ] -> head
-    | _ -> begin
-        Console.WriteLine "parse failure"
-        "parse failure"
-        end
+    let paragraphs = bodyNode.Descendants ["p"] |> List.ofSeq
+    let paraList = paragraphs |> List.map (fun p -> p.ToString()) |> List.map extractParagraph
+    let body = String.Join("\r\n", paraList)
+    body
 
 let extractArticle (chapter: string) (articleNode: HtmlNode): Article =
     let href = (articleNode.Descendants ["a"] |> Seq.head).AttributeValue("href")
@@ -71,8 +64,16 @@ let main _ =
     let articles = index |> List.collect (fun c -> createArticleIndex c.url c.title |> List.ofSeq)
     let list = List.zip articles [1..articles.Length]
 
+    let mutable currentChapter = ""
+    
     for (art, index) in list do
         art.index <- index
+        
+        if art.chapter <> currentChapter then
+            currentChapter <- art.chapter
+        else
+            art.chapter <- "''"
+        
         saveArticle art
         
     Console.WriteLine "Output toc.yml..."
